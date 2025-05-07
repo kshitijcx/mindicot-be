@@ -1,13 +1,16 @@
 import express from "express";
 import http from "http";
+import cors from "cors";
 import { Server } from "socket.io";
 import MendicotGame from "./gameLogic.js";
+
+const PORT = process.env.PORT || 3000;
 
 const app = express();
 app.use(cors());
 
 const server = http.createServer(app);
-const io = socketIO(server, {
+const io = new Server(server, {
   cors: {
     origin: "*", // Allow all for testing. Secure this in production.
     methods: ["GET", "POST"],
@@ -36,6 +39,6 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(3000, () => {
-  console.log("Mendicot server running at http://localhost:3000");
+server.listen(PORT, () => {
+  console.log("Mendicot server running on port 3000");
 });
