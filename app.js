@@ -4,8 +4,15 @@ import { Server } from "socket.io";
 import MendicotGame from "./gameLogic.js";
 
 const app = express();
+app.use(cors());
+
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const io = socketIO(server, {
+  cors: {
+    origin: "*", // Allow all for testing. Secure this in production.
+    methods: ["GET", "POST"],
+  },
+});
 
 const game = new MendicotGame();
 
