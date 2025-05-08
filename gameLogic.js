@@ -8,6 +8,8 @@ class MendicotGame {
     this.currentSuit = null;
     this.trumpSuit = null;
     this.teamScores = { 1: 0, 2: 0 }; // Track scores for both teams
+    this.tensWon = { 1: 0, 2: 0 }; // Track number of 10s won by each team
+    this.gameOver = false;
   }
 
   addPlayer(socket) {
@@ -100,6 +102,8 @@ class MendicotGame {
   }
 
   playCard(socketId, card) {
+    if (this.gameOver) return; // Don't allow plays if game is over
+    
     const currentPlayerId = this.players[this.turn].id;
     if (socketId !== currentPlayerId) return;
 
@@ -153,6 +157,7 @@ class MendicotGame {
           : max
       );
       this.updateTeamScore(highestTrump.playerId);
+      this.checkForTens(highestTrump.playerId);
       return highestTrump.playerId;
     }
 
@@ -165,7 +170,25 @@ class MendicotGame {
         : max
     );
     this.updateTeamScore(highestLead.playerId);
+    this.checkForTens(highestLead.playerId);
     return highestLead.playerId;
+  }
+
+  checkForTens(winningPlayerId) {
+    const winningPlayer = this.players.find(p => p.id === winningPlayerId);
+    if (!winningPlayer) return;
+
+    // Check if the winning card is a 10
+    const winningCard = this.trick.find(t => t.playerId === winningPlayerId)?.card;
+    if (winningCard && winningCard.value === "10") {
+      this.tensWon[winningPlayer.team]++;
+      
+      // Check if a team has won more than 2 tens
+      if (this.tensWon[winningPlayer.team] > 2) {
+        this.gameOver = true;
+        this.broadcastGameOver(winningPlayer.team);
+      }
+    }
   }
 
   updateTeamScore(winningPlayerId) {
@@ -175,13 +198,25 @@ class MendicotGame {
     }
   }
 
+  broadcastGameOver(winningTeam) {
+    this.players.forEach((player) => {
+      player.socket.emit("gameOver", {
+        winningTeam: winningTeam,
+        tensWon: this.tensWon,
+        teamScores: this.teamScores
+      });
+    });
+  }
+
   broadcastGameState() {
     this.players.forEach((player) => {
       player.socket.emit("gameState", {
         handsRemaining: this.hands[player.id].length,
         currentTrick: this.trick,
         turn: this.players[this.turn].id,
-        teamScores: this.teamScores
+        teamScores: this.teamScores,
+        tensWon: this.tensWon,
+        gameOver: this.gameOver
       });
     });
   }
