@@ -25,6 +25,8 @@ class MendicotGame {
     this.players.push({ id: socket.id, socket, team });
 
     if (this.players.length === 4) {
+      // Reset turn to 0 when starting a new game
+      this.turn = 0;
       setTimeout(() => this.startGame(), 1000);
     } else {
       this.broadcastWaitingStatus();
@@ -109,7 +111,7 @@ class MendicotGame {
         yourIndex: idx,
         yourId: player.id,
         players: this.players.map(p => ({ id: p.id, team: p.team })),
-        turn: this.players[this.turn].id,
+        turn: this.players[this.turn]?.id || null,
         trumpSuit: this.trumpSuit,
         team: player.team,
         teamScores: this.teamScores
@@ -118,12 +120,15 @@ class MendicotGame {
   }
 
   playCard(socketId, card) {
-    if (this.gameOver) return; // Don't allow plays if game is over
+    if (this.gameOver) return;
     
-    const currentPlayerId = this.players[this.turn].id;
-    if (socketId !== currentPlayerId) return;
+    // Verify the current player's turn
+    const currentPlayer = this.players[this.turn];
+    if (!currentPlayer || socketId !== currentPlayer.id) return;
 
     const hand = this.hands[socketId];
+    if (!hand) return;
+
     const cardIndex = hand.findIndex(
       (c) => c.suit === card.suit && c.value === card.value
     );
@@ -140,7 +145,10 @@ class MendicotGame {
 
     if (this.trick.length === 4) {
       const winnerId = this.evaluateTrickWinner();
-      this.turn = this.players.findIndex((p) => p.id === winnerId);
+      const winnerIndex = this.players.findIndex((p) => p.id === winnerId);
+      if (winnerIndex !== -1) {
+        this.turn = winnerIndex;
+      }
       this.trick = [];
       this.currentSuit = null;
 
@@ -277,7 +285,7 @@ class MendicotGame {
       player.socket.emit("gameState", {
         handsRemaining: this.hands[player.id].length,
         currentTrick: this.trick,
-        turn: this.players[this.turn].id,
+        turn: this.players[this.turn]?.id || null,
         yourId: player.id,
         players: this.players.map(p => ({ id: p.id, team: p.team })),
         teamScores: this.teamScores,
