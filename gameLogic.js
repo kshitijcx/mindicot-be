@@ -24,13 +24,23 @@ class MendicotGame {
       this.reset();
     }
 
-    if (this.players.length >= 4) return false;
+    // Check if player is already in the game
+    if (this.players.some(p => p.id === socket.id)) {
+      return true;
+    }
+
+    if (this.players.length >= 4) {
+      console.log("Room is full, rejecting connection");
+      return false;
+    }
     
     // Assign team based on player position (0,2 = team 1, 1,3 = team 2)
     const team = this.players.length % 2 === 0 ? 1 : 2;
     this.players.push({ id: socket.id, socket, team });
+    console.log(`Player ${socket.id} connected. Total players: ${this.players.length}`);
 
     if (this.players.length === 4) {
+      console.log("All players connected, starting game");
       // Reset turn to 0 when starting a new game
       this.turn = 0;
       setTimeout(() => this.startGame(), 1000);
@@ -41,8 +51,10 @@ class MendicotGame {
   }
 
   removePlayer(socketId) {
+    console.log(`Removing player ${socketId}`);
     // Remove the player
     this.players = this.players.filter((p) => p.id !== socketId);
+    console.log(`Remaining players: ${this.players.length}`);
     
     // If all players have disconnected, reset the game
     if (this.players.length === 0) {
@@ -56,6 +68,7 @@ class MendicotGame {
 
   broadcastWaitingStatus() {
     const connected = this.players.length;
+    console.log(`Broadcasting waiting status: ${connected}/4 players`);
     this.players.forEach((p) => {
       p.socket.emit("waitingForPlayers", {
         playersConnected: connected,
