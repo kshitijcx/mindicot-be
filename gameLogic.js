@@ -1,5 +1,9 @@
 class MendicotGame {
   constructor() {
+    this.reset();
+  }
+
+  reset() {
     this.players = []; // { id, socket, team }
     this.deck = [];
     this.hands = {};
@@ -9,8 +13,8 @@ class MendicotGame {
     this.trumpSuit = null;
     this.teamScores = { 1: 0, 2: 0 }; // Track scores for both teams
     this.tensWon = { 1: 0, 2: 0 }; // Track number of 10s won by each team
-    this.gameOver = false;
     this.tricksWon = { 1: 0, 2: 0 }; // Track number of tricks won by each team
+    this.gameOver = false;
   }
 
   addPlayer(socket) {
@@ -30,6 +34,13 @@ class MendicotGame {
 
   removePlayer(socketId) {
     this.players = this.players.filter((p) => p.id !== socketId);
+    
+    // If all players have disconnected, reset the game
+    if (this.players.length === 0) {
+      this.reset();
+      return;
+    }
+    
     this.broadcastWaitingStatus();
   }
 
@@ -39,6 +50,8 @@ class MendicotGame {
       p.socket.emit("waitingForPlayers", {
         playersConnected: connected,
         playersNeeded: 4 - connected,
+        yourId: p.id,
+        players: this.players.map(player => ({ id: player.id, team: player.team }))
       });
     });
   }
@@ -94,6 +107,8 @@ class MendicotGame {
       player.socket.emit("gameStart", {
         hand: this.hands[player.id],
         yourIndex: idx,
+        yourId: player.id,
+        players: this.players.map(p => ({ id: p.id, team: p.team })),
         turn: this.players[this.turn].id,
         trumpSuit: this.trumpSuit,
         team: player.team,
@@ -263,6 +278,8 @@ class MendicotGame {
         handsRemaining: this.hands[player.id].length,
         currentTrick: this.trick,
         turn: this.players[this.turn].id,
+        yourId: player.id,
+        players: this.players.map(p => ({ id: p.id, team: p.team })),
         teamScores: this.teamScores,
         tensWon: this.tensWon,
         tricksWon: this.tricksWon,
