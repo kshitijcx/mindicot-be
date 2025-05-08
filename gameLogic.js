@@ -39,13 +39,18 @@ class MendicotGame {
     this.players.push({ id: socket.id, socket, team });
     console.log(`Player ${socket.id} connected. Total players: ${this.players.length}`);
 
+    // Always broadcast current state to all players
+    this.broadcastWaitingStatus();
+
     if (this.players.length === 4) {
-      console.log("All players connected, starting game");
+      console.log("All players connected, preparing to start game");
       // Reset turn to 0 when starting a new game
       this.turn = 0;
-      setTimeout(() => this.startGame(), 1000);
-    } else {
-      this.broadcastWaitingStatus();
+      // Give a small delay to ensure all clients receive the final state
+      setTimeout(() => {
+        console.log("Starting game with players:", this.players.map(p => p.id));
+        this.startGame();
+      }, 1000);
     }
     return true;
   }
@@ -68,18 +73,26 @@ class MendicotGame {
 
   broadcastWaitingStatus() {
     const connected = this.players.length;
-    console.log(`Broadcasting waiting status: ${connected}/4 players`);
+    console.log(`Broadcasting waiting status: ${connected}/4 players to all players`);
+    
+    // Create the state object once
+    const state = {
+      playersConnected: connected,
+      playersNeeded: 4 - connected,
+      players: this.players.map(player => ({ id: player.id, team: player.team }))
+    };
+
+    // Send to each player with their specific ID
     this.players.forEach((p) => {
       p.socket.emit("waitingForPlayers", {
-        playersConnected: connected,
-        playersNeeded: 4 - connected,
-        yourId: p.id,
-        players: this.players.map(player => ({ id: player.id, team: player.team }))
+        ...state,
+        yourId: p.id
       });
     });
   }
 
   startGame() {
+    console.log("Starting game with", this.players.length, "players");
     // Ensure clean state before starting
     this.reset();
     
@@ -87,6 +100,8 @@ class MendicotGame {
     this.shuffle(this.deck);
     this.trumpSuit = this.chooseTrump();
     this.dealCards();
+    
+    // Broadcast game start to all players
     this.broadcastGameStart();
   }
 
@@ -129,8 +144,9 @@ class MendicotGame {
   }
 
   broadcastGameStart() {
+    console.log("Broadcasting game start to all players");
     this.players.forEach((player, idx) => {
-      player.socket.emit("gameStart", {
+      const gameState = {
         hand: this.hands[player.id],
         yourIndex: idx,
         yourId: player.id,
@@ -139,7 +155,9 @@ class MendicotGame {
         trumpSuit: this.trumpSuit,
         team: player.team,
         teamScores: this.teamScores
-      });
+      };
+      console.log(`Sending game start to player ${player.id}:`, gameState);
+      player.socket.emit("gameStart", gameState);
     });
   }
 

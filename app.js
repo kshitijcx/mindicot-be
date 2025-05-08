@@ -30,12 +30,14 @@ io.on("connection", (socket) => {
     return;
   }
 
-  // Immediately send current game state to the new player
-  socket.emit("waitingForPlayers", {
-    playersConnected: game.players.length,
-    playersNeeded: 4 - game.players.length,
-    yourId: socket.id,
-    players: game.players.map(p => ({ id: p.id, team: p.team }))
+  // Broadcast updated state to ALL players when a new player joins
+  game.players.forEach(player => {
+    player.socket.emit("waitingForPlayers", {
+      playersConnected: game.players.length,
+      playersNeeded: 4 - game.players.length,
+      yourId: player.id,
+      players: game.players.map(p => ({ id: p.id, team: p.team }))
+    });
   });
 
   socket.on("playCard", (card) => {
