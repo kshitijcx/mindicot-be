@@ -132,4 +132,4 @@ class MendicotGame {
   }
 }
 
-module.exports = MendicotGame;
+export default MendicotGame;
