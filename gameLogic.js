@@ -1,17 +1,21 @@
 class MendicotGame {
   constructor() {
-    this.players = []; // { id, socket }
+    this.players = []; // { id, socket, team }
     this.deck = [];
     this.hands = {};
     this.turn = 0;
     this.trick = [];
     this.currentSuit = null;
     this.trumpSuit = null;
+    this.teamScores = { 1: 0, 2: 0 }; // Track scores for both teams
   }
 
   addPlayer(socket) {
     if (this.players.length >= 4) return false;
-    this.players.push({ id: socket.id, socket });
+    
+    // Assign team based on player position (0,2 = team 1, 1,3 = team 2)
+    const team = this.players.length % 2 === 0 ? 1 : 2;
+    this.players.push({ id: socket.id, socket, team });
 
     if (this.players.length === 4) {
       setTimeout(() => this.startGame(), 1000);
@@ -89,6 +93,8 @@ class MendicotGame {
         yourIndex: idx,
         turn: this.players[this.turn].id,
         trumpSuit: this.trumpSuit,
+        team: player.team,
+        teamScores: this.teamScores
       });
     });
   }
@@ -146,6 +152,7 @@ class MendicotGame {
           ? curr
           : max
       );
+      this.updateTeamScore(highestTrump.playerId);
       return highestTrump.playerId;
     }
 
@@ -157,7 +164,15 @@ class MendicotGame {
         ? curr
         : max
     );
+    this.updateTeamScore(highestLead.playerId);
     return highestLead.playerId;
+  }
+
+  updateTeamScore(winningPlayerId) {
+    const winningPlayer = this.players.find(p => p.id === winningPlayerId);
+    if (winningPlayer) {
+      this.teamScores[winningPlayer.team]++;
+    }
   }
 
   broadcastGameState() {
@@ -166,6 +181,7 @@ class MendicotGame {
         handsRemaining: this.hands[player.id].length,
         currentTrick: this.trick,
         turn: this.players[this.turn].id,
+        teamScores: this.teamScores
       });
     });
   }
