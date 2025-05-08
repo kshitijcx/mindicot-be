@@ -93,14 +93,32 @@ class MendicotGame {
 
   startGame() {
     console.log("Starting game with", this.players.length, "players");
-    // Ensure clean state before starting
-    this.reset();
     
+    // Save current players
+    const currentPlayers = [...this.players];
+    
+    // Reset game state but preserve players
+    this.deck = [];
+    this.hands = {};
+    this.turn = 0;
+    this.trick = [];
+    this.currentSuit = null;
+    this.trumpSuit = null;
+    this.teamScores = { 1: 0, 2: 0 };
+    this.tensWon = { 1: 0, 2: 0 };
+    this.tricksWon = { 1: 0, 2: 0 };
+    this.gameOver = false;
+    
+    // Restore players
+    this.players = currentPlayers;
+    
+    // Initialize game
     this.deck = this.generateDeck();
     this.shuffle(this.deck);
     this.trumpSuit = this.chooseTrump();
     this.dealCards();
     
+    console.log("Game initialized, broadcasting start to players:", this.players.map(p => p.id));
     // Broadcast game start to all players
     this.broadcastGameStart();
   }
