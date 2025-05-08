@@ -10,6 +10,7 @@ class MendicotGame {
     this.teamScores = { 1: 0, 2: 0 }; // Track scores for both teams
     this.tensWon = { 1: 0, 2: 0 }; // Track number of 10s won by each team
     this.gameOver = false;
+    this.tricksWon = { 1: 0, 2: 0 }; // Track number of tricks won by each team
   }
 
   addPlayer(socket) {
@@ -127,6 +128,11 @@ class MendicotGame {
       this.turn = this.players.findIndex((p) => p.id === winnerId);
       this.trick = [];
       this.currentSuit = null;
+
+      // Check if all cards have been played (13 tricks completed)
+      if (this.hands[this.players[0].id].length === 0) {
+        this.determineGameWinner();
+      }
     }
 
     this.broadcastGameState();
@@ -158,6 +164,7 @@ class MendicotGame {
       );
       this.updateTeamScore(highestTrump.playerId);
       this.checkForTens(highestTrump.playerId);
+      this.updateTricksWon(highestTrump.playerId);
       return highestTrump.playerId;
     }
 
@@ -171,6 +178,7 @@ class MendicotGame {
     );
     this.updateTeamScore(highestLead.playerId);
     this.checkForTens(highestLead.playerId);
+    this.updateTricksWon(highestLead.playerId);
     return highestLead.playerId;
   }
 
@@ -198,11 +206,59 @@ class MendicotGame {
     }
   }
 
-  broadcastGameOver(winningTeam) {
+  updateTricksWon(winningPlayerId) {
+    const winningPlayer = this.players.find(p => p.id === winningPlayerId);
+    if (winningPlayer) {
+      this.tricksWon[winningPlayer.team]++;
+    }
+  }
+
+  determineGameWinner() {
+    this.gameOver = true;
+    let winningTeam = null;
+    let winReason = '';
+
+    // First check for team with more than 2 tens
+    if (this.tensWon[1] > 2) {
+      winningTeam = 1;
+      winReason = 'captured more than 2 tens';
+    } else if (this.tensWon[2] > 2) {
+      winningTeam = 2;
+      winReason = 'captured more than 2 tens';
+    } else {
+      // If no team has more than 2 tens, check tricks won
+      if (this.tricksWon[1] > this.tricksWon[2]) {
+        winningTeam = 1;
+        winReason = 'won more tricks';
+      } else if (this.tricksWon[2] > this.tricksWon[1]) {
+        winningTeam = 2;
+        winReason = 'won more tricks';
+      } else {
+        // If tricks are equal, check tens won
+        if (this.tensWon[1] > this.tensWon[2]) {
+          winningTeam = 1;
+          winReason = 'captured more tens';
+        } else if (this.tensWon[2] > this.tensWon[1]) {
+          winningTeam = 2;
+          winReason = 'captured more tens';
+        } else {
+          // If everything is equal, it's a tie
+          winningTeam = 0;
+          winReason = 'tie';
+        }
+      }
+    }
+
+    this.broadcastGameOver(winningTeam, winReason);
+  }
+
+  broadcastGameOver(winningTeam, winReason) {
     this.players.forEach((player) => {
       player.socket.emit("gameOver", {
         winningTeam: winningTeam,
+        winReason: winReason,
         tensWon: this.tensWon,
+        tricksWon: this.tricksWon,
         teamScores: this.teamScores
       });
     });
@@ -216,6 +272,7 @@ class MendicotGame {
         turn: this.players[this.turn].id,
         teamScores: this.teamScores,
         tensWon: this.tensWon,
+        tricksWon: this.tricksWon,
         gameOver: this.gameOver
       });
     });
