@@ -38,6 +38,16 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('get_current_turn', () => {
+    if (!game) return socket.emit('error', { message: 'Game not started' });
+
+    // Find the player index of the current turn
+    const currentTurnIndex = game.players.findIndex(p => p.id === game.players[game.currentTurn].id);
+
+    // Emit to this socket only
+    socket.emit('current_turn', currentTurnIndex);
+  });
+
   socket.on('play_card', (card) => {
     if (!game) return socket.emit('error', { message: 'Game not started' });
 
