@@ -1,8 +1,7 @@
-// server.js
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const MendicotGame = require('./mendicotGame');
+import express from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
+import MendicotGame from './gameLogic.js';
 
 const app = express();
 const server = http.createServer(app);
