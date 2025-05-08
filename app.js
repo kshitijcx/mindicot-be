@@ -1,55 +1,81 @@
-import express from "express";
-import http from "http";
-import cors from "cors";
-import { Server } from "socket.io";
-import MendicotGame from "./gameLogic.js";
+// server.js
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const MendicotGame = require('./mendicotGame');
 
 const PORT = process.env.PORT || 3000;
 
 const app = express();
-app.use(cors());
-
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "*", // Allow all for testing. Secure this in production.
-    methods: ["GET", "POST"],
-  },
-});
+const io = new Server(server);
 
-const game = new MendicotGame();
+let playerSockets = [];
+let game = null;
 
-io.on("connection", (socket) => {
-  console.log("Player connected:", socket.id);
+io.on('connection', (socket) => {
+  console.log('Player connected:', socket.id);
 
-  const success = game.addPlayer(socket);
-  if (!success) {
-    console.log("Room full, disconnecting player:", socket.id);
-    socket.emit("roomFull");
-    socket.disconnect();
-    return;
-  }
+  socket.on('join_game', () => {
+    if (playerSockets.length < 4) {
+      playerSockets.push(socket);
+      socket.emit('joined', { playerIndex: playerSockets.length - 1 });
 
-  // Broadcast updated state to ALL players when a new player joins
-  game.players.forEach(player => {
-    player.socket.emit("waitingForPlayers", {
-      playersConnected: game.players.length,
-      playersNeeded: 4 - game.players.length,
-      yourId: player.id,
-      players: game.players.map(p => ({ id: p.id, team: p.team }))
-    });
+      if (playerSockets.length === 4) {
+        const playerIds = playerSockets.map(s => s.id);
+        game = new MendicotGame(playerIds);
+
+        playerSockets.forEach((s, i) => {
+          s.emit('game_start', {
+            playerIndex: i,
+            hand: game.players[i].hand,
+            trump: game.trumpSuit
+          });
+        });
+      }
+    } else {
+      socket.emit('error', { message: 'Game already has 4 players.' });
+    }
   });
 
-  socket.on("playCard", (card) => {
-    game.playCard(socket.id, card);
+  socket.on('play_card', (card) => {
+    if (!game) return socket.emit('error', { message: 'Game not started' });
+
+    const result = game.playTurn(socket.id, card);
+
+    if (result.error) {
+      socket.emit('invalid_move', result.error);
+    } else {
+      io.emit('card_played', { playerId: socket.id, card });
+
+      if (game.currentTrick.length === 0) {
+        io.emit('trick_complete', {
+          tricksWon: game.tricksWon,
+          tensCount: game.tensCount
+        });
+
+        if (game.gameOver) {
+          io.emit('game_over', {
+            winner: game.tricksWon[0] > game.tricksWon[1] ? 'Team 0' : 'Team 1',
+            finalStats: {
+              tricksWon: game.tricksWon,
+              tensCount: game.tensCount,
+              trump: game.trumpSuit
+            }
+          });
+        }
+      }
+    }
   });
 
-  socket.on("disconnect", () => {
-    console.log("Player disconnected:", socket.id);
-    game.removePlayer(socket.id);
+  socket.on('disconnect', () => {
+    console.log('Player disconnected:', socket.id);
+    playerSockets = playerSockets.filter(s => s.id !== socket.id);
+    game = null;
+    io.emit('game_reset');
   });
 });
 
 server.listen(PORT, () => {
-  console.log("Mendicot server running on port 3000");
+  console.log('Mendicot WebSocket server running on http://localhost:3000');
 });
