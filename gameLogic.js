@@ -4,20 +4,26 @@ class MendicotGame {
   }
 
   reset() {
-    this.players = []; // { id, socket, team }
+    // Clear all game state
+    this.players = [];
     this.deck = [];
     this.hands = {};
     this.turn = 0;
     this.trick = [];
     this.currentSuit = null;
     this.trumpSuit = null;
-    this.teamScores = { 1: 0, 2: 0 }; // Track scores for both teams
-    this.tensWon = { 1: 0, 2: 0 }; // Track number of 10s won by each team
-    this.tricksWon = { 1: 0, 2: 0 }; // Track number of tricks won by each team
+    this.teamScores = { 1: 0, 2: 0 };
+    this.tensWon = { 1: 0, 2: 0 };
+    this.tricksWon = { 1: 0, 2: 0 };
     this.gameOver = false;
   }
 
   addPlayer(socket) {
+    // If this is the first player after a reset, ensure clean state
+    if (this.players.length === 0) {
+      this.reset();
+    }
+
     if (this.players.length >= 4) return false;
     
     // Assign team based on player position (0,2 = team 1, 1,3 = team 2)
@@ -35,10 +41,12 @@ class MendicotGame {
   }
 
   removePlayer(socketId) {
+    // Remove the player
     this.players = this.players.filter((p) => p.id !== socketId);
     
     // If all players have disconnected, reset the game
     if (this.players.length === 0) {
+      console.log("All players disconnected, resetting game state");
       this.reset();
       return;
     }
@@ -59,6 +67,9 @@ class MendicotGame {
   }
 
   startGame() {
+    // Ensure clean state before starting
+    this.reset();
+    
     this.deck = this.generateDeck();
     this.shuffle(this.deck);
     this.trumpSuit = this.chooseTrump();
