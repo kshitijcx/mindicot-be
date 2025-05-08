@@ -4,8 +4,6 @@ const http = require('http');
 const { Server } = require('socket.io');
 const MendicotGame = require('./mendicotGame');
 
-const PORT = process.env.PORT || 3000;
-
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
@@ -19,7 +17,10 @@ io.on('connection', (socket) => {
   socket.on('join_game', () => {
     if (playerSockets.length < 4) {
       playerSockets.push(socket);
-      socket.emit('joined', { playerIndex: playerSockets.length - 1 });
+      const playerIndex = playerSockets.length - 1;
+
+      socket.emit('joined', { playerIndex, playerCount: playerSockets.length });
+      io.emit('player_count', { count: playerSockets.length });
 
       if (playerSockets.length === 4) {
         const playerIds = playerSockets.map(s => s.id);
@@ -73,9 +74,10 @@ io.on('connection', (socket) => {
     playerSockets = playerSockets.filter(s => s.id !== socket.id);
     game = null;
     io.emit('game_reset');
+    io.emit('player_count', { count: playerSockets.length });
   });
 });
 
-server.listen(PORT, () => {
+server.listen(3000, () => {
   console.log('Mendicot WebSocket server running on http://localhost:3000');
 });
