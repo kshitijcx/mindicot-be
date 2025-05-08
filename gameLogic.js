@@ -184,7 +184,10 @@ class MendicotGame {
     
     // Verify the current player's turn
     const currentPlayer = this.players[this.turn];
-    if (!currentPlayer || socketId !== currentPlayer.id) return;
+    if (!currentPlayer || socketId !== currentPlayer.id) {
+      console.log(`Not your turn. Current turn: ${currentPlayer?.id}, Your ID: ${socketId}`);
+      return;
+    }
 
     const hand = this.hands[socketId];
     if (!hand) return;
@@ -194,30 +197,66 @@ class MendicotGame {
     );
     if (cardIndex === -1) return;
 
+    // Remove the played card from hand
     hand.splice(cardIndex, 1);
+    console.log(`Player ${socketId} played ${card.suit}${card.value}`);
 
+    // Set the lead suit if this is the first card of the trick
     if (this.trick.length === 0) {
       this.currentSuit = card.suit;
+      console.log(`Lead suit set to ${this.currentSuit}`);
     }
 
+    // Add the card to the current trick
     this.trick.push({ playerId: socketId, card });
-    this.turn = (this.turn + 1) % 4;
+    console.log(`Current trick has ${this.trick.length} cards`);
 
+    // Move to next player
+    this.turn = (this.turn + 1) % 4;
+    const nextPlayer = this.players[this.turn];
+    console.log(`Turn moved to player ${nextPlayer.id}`);
+
+    // Emit card played event to all players
+    this.players.forEach(player => {
+      player.socket.emit("cardPlayed", {
+        playerId: socketId,
+        card: card,
+        nextTurn: nextPlayer.id
+      });
+    });
+
+    // If all 4 players have played, evaluate the trick
     if (this.trick.length === 4) {
+      console.log("Trick complete, evaluating winner");
       const winnerId = this.evaluateTrickWinner();
       const winnerIndex = this.players.findIndex((p) => p.id === winnerId);
       if (winnerIndex !== -1) {
         this.turn = winnerIndex;
+        const nextPlayer = this.players[this.turn];
+        console.log(`Trick won by player ${winnerId}, starting new trick`);
+        
+        // Emit trick complete event to all players
+        this.players.forEach(player => {
+          player.socket.emit("trickComplete", {
+            winningTeam: this.players[winnerIndex].team,
+            teamScores: this.teamScores,
+            tensWon: this.tensWon,
+            tricksWon: this.tricksWon,
+            nextTurn: nextPlayer.id
+          });
+        });
       }
       this.trick = [];
       this.currentSuit = null;
 
       // Check if all cards have been played (13 tricks completed)
       if (this.hands[this.players[0].id].length === 0) {
+        console.log("All cards played, determining game winner");
         this.determineGameWinner();
       }
     }
 
+    // Broadcast updated game state to all players
     this.broadcastGameState();
   }
 
@@ -257,6 +296,10 @@ class MendicotGame {
       "A",
     ];
 
+    console.log("Evaluating trick winner. Current trick:", this.trick);
+    console.log("Trump suit:", this.trumpSuit);
+
+    // First check for trump cards
     const trumpTrick = this.trick.filter((t) => t.card.suit === this.trumpSuit);
     if (trumpTrick.length > 0) {
       const highestTrump = trumpTrick.reduce((max, curr) =>
@@ -264,12 +307,14 @@ class MendicotGame {
           ? curr
           : max
       );
+      console.log(`Highest trump card: ${highestTrump.card.suit}${highestTrump.card.value}`);
       this.updateTeamScore(highestTrump.playerId);
-      if (this.checkForTens(highestTrump.playerId)) return highestTrump.playerId; // Game is over
+      this.checkForTens(highestTrump.playerId);
       this.updateTricksWon(highestTrump.playerId);
       return highestTrump.playerId;
     }
 
+    // If no trump cards, check lead suit
     const leadTrick = this.trick.filter(
       (t) => t.card.suit === this.currentSuit
     );
@@ -278,8 +323,9 @@ class MendicotGame {
         ? curr
         : max
     );
+    console.log(`Highest lead card: ${highestLead.card.suit}${highestLead.card.value}`);
     this.updateTeamScore(highestLead.playerId);
-    if (this.checkForTens(highestLead.playerId)) return highestLead.playerId; // Game is over
+    this.checkForTens(highestLead.playerId);
     this.updateTricksWon(highestLead.playerId);
     return highestLead.playerId;
   }
@@ -342,8 +388,8 @@ class MendicotGame {
 
   broadcastGameState() {
     this.players.forEach((player) => {
-      player.socket.emit("gameState", {
-        handsRemaining: this.hands[player.id].length,
+      const gameState = {
+        hand: this.hands[player.id],
         currentTrick: this.trick,
         turn: this.players[this.turn]?.id || null,
         yourId: player.id,
@@ -351,8 +397,12 @@ class MendicotGame {
         teamScores: this.teamScores,
         tensWon: this.tensWon,
         tricksWon: this.tricksWon,
-        gameOver: this.gameOver
-      });
+        gameOver: this.gameOver,
+        currentSuit: this.currentSuit,
+        trumpSuit: this.trumpSuit
+      };
+      console.log(`Broadcasting game state to player ${player.id}:`, gameState);
+      player.socket.emit("gameState", gameState);
     });
   }
 }
