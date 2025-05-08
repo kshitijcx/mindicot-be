@@ -24,10 +24,19 @@ io.on("connection", (socket) => {
 
   const success = game.addPlayer(socket);
   if (!success) {
+    console.log("Room full, disconnecting player:", socket.id);
     socket.emit("roomFull");
     socket.disconnect();
     return;
   }
+
+  // Immediately send current game state to the new player
+  socket.emit("waitingForPlayers", {
+    playersConnected: game.players.length,
+    playersNeeded: 4 - game.players.length,
+    yourId: socket.id,
+    players: game.players.map(p => ({ id: p.id, team: p.team }))
+  });
 
   socket.on("playCard", (card) => {
     game.playCard(socket.id, card);
