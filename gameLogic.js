@@ -119,11 +119,18 @@ class MendicotGame {
     const winningTeam = winningCard.playerIndex % 2;
     this.tricksWon[winningTeam] += 1;
 
+    // Count tens in the trick and assign to the winning team
+    let tensInTrick = 0;
     this.currentTrick.forEach(play => {
       if (play.card.isTen()) {
-        this.tensCount[play.playerIndex % 2] += 1;
+        tensInTrick += 1;
       }
     });
+    
+    // Add any tens found to the winning team's count
+    if (tensInTrick > 0) {
+      this.tensCount[winningTeam] += tensInTrick;
+    }
 
     this.tricks.push([...this.currentTrick]); // Save a copy of the trick
     this.currentTrick = []; // Clear for next trick
