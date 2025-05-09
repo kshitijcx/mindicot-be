@@ -81,14 +81,35 @@ io.on('connection', (socket) => {
         io.emit('current_turn', game.currentTurn);
 
         if (game.gameOver) {
-          io.emit('game_over', {
-            winner: game.tricksWon[0] > game.tricksWon[1] ? 'Team 0' : 'Team 1',
-            finalStats: {
-              tricksWon: game.tricksWon,
-              tensCount: game.tensCount,
-              trump: game.trumpSuit
-            }
-          });
+          let result;
+          
+          if (game.isTie) {
+            result = {
+              outcome: 'tie',
+              message: 'Game ended in a tie! Both teams collected 2 tens each.',
+              finalStats: {
+                tricksWon: game.tricksWon,
+                tensCount: game.tensCount,
+                trump: game.trumpSuit
+              }
+            };
+          } else {
+            const winningTeam = game.winningTeam !== null ? game.winningTeam : 
+                               (game.tricksWon[0] > game.tricksWon[1] ? 0 : 1);
+            
+            result = {
+              outcome: 'win',
+              winner: `Team ${winningTeam}`,
+              message:`Team ${winningTeam} wins by collecting ${game.tensCount[winningTeam]} tens!`,
+              finalStats: {
+                tricksWon: game.tricksWon,
+                tensCount: game.tensCount,
+                trump: game.trumpSuit
+              }
+            };
+          }
+          
+          io.emit('game_over', result);
         }
       }
     }

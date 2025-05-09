@@ -41,6 +41,8 @@ class MendicotGame {
     this.currentTurn = 0;
     this.lastTrickWinner = null; // Store the index of who won the last trick
     this.gameOver = false;
+    this.winningTeam = null; // Store the winning team index
+    this.isTie = false; // Flag for tie game
     this.dealCards();
     this.selectTrump();
   }
@@ -143,8 +145,37 @@ class MendicotGame {
   }
 
   checkGameEnd() {
+    // Check for ten-based victory conditions first
+    if (this.tensCount[0] > 2) {
+      this.gameOver = true;
+      this.winningTeam = 0;
+      return;
+    }
+    
+    if (this.tensCount[1] > 2) {
+      this.gameOver = true;
+      this.winningTeam = 1;
+      return;
+    }
+    
+    // Check for a tie (both teams have exactly 2 tens)
+    if (this.tensCount[0] === 2 && this.tensCount[1] === 2) {
+      this.gameOver = true;
+      this.isTie = true;
+      return;
+    }
+    
+    // Original end condition (all tricks played)
     if (this.tricks.length >= 13) {
       this.gameOver = true;
+      // Determine winner based on tens count
+      if (this.tensCount[0] > this.tensCount[1]) {
+        this.winningTeam = 0;
+      } else if (this.tensCount[1] > this.tensCount[0]) {
+        this.winningTeam = 1;
+      } else {
+        this.isTie = true;
+      }
     }
   }
 }
