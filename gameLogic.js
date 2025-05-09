@@ -39,6 +39,7 @@ class MendicotGame {
     this.tricksWon = [0, 0];
     this.currentTrick = [];
     this.currentTurn = 0;
+    this.lastTrickWinner = null; // Store the index of who won the last trick
     this.gameOver = false;
     this.dealCards();
     this.selectTrump();
@@ -77,10 +78,15 @@ class MendicotGame {
     this.trumpSuit = trumpCard.suit;
   }
 
+  getPlayerById(playerId) {
+    return this.players.findIndex(p => p.id === playerId);
+  }
+
   playTurn(playerId, card) {
     if (this.gameOver) return { error: "Game is over" };
 
-    const playerIndex = this.players.findIndex(p => p.id === playerId);
+    const playerIndex = this.getPlayerById(playerId);
+    if (playerIndex === -1) return { error: "Player not found" };
     if (playerIndex !== this.currentTurn) return { error: "Not your turn" };
 
     const playedCard = this.players[playerIndex].playCard(card);
@@ -99,11 +105,12 @@ class MendicotGame {
   evaluateTrick() {
     const leadSuit = this.currentTrick[0].card.suit;
     let winningCard = this.currentTrick[0];
+    
     for (let play of this.currentTrick.slice(1)) {
       const { card } = play;
       if (
-        (card.suit === winningCard.card.suit && card.getValue() > winningCard.card.getValue()) ||
-        (card.suit === this.trumpSuit && winningCard.card.suit !== this.trumpSuit)
+        (card.suit === this.trumpSuit && winningCard.card.suit !== this.trumpSuit) ||
+        (card.suit === winningCard.card.suit && card.getValue() > winningCard.card.getValue())
       ) {
         winningCard = play;
       }
@@ -118,9 +125,12 @@ class MendicotGame {
       }
     });
 
-    this.tricks.push(this.currentTrick);
-    this.currentTrick = [];
+    this.tricks.push([...this.currentTrick]); // Save a copy of the trick
+    this.currentTrick = []; // Clear for next trick
+    
+    // Set next turn to the winning player
     this.currentTurn = winningCard.playerIndex;
+    this.lastTrickWinner = winningCard.playerIndex;
 
     this.checkGameEnd();
   }

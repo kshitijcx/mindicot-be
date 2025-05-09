@@ -32,6 +32,9 @@ io.on('connection', (socket) => {
             trump: game.trumpSuit
           });
         });
+        
+        // Announce whose turn it is to start the game
+        io.emit('current_turn', game.currentTurn);
       }
     } else {
       socket.emit('error', { message: 'Game already has 4 players.' });
@@ -42,7 +45,7 @@ io.on('connection', (socket) => {
     if (!game) return socket.emit('error', { message: 'Game not started' });
 
     // Find the player index of the current turn
-    const currentTurnIndex = game.players.findIndex(p => p.id === game.players[game.currentTurn].id);
+    const currentTurnIndex = game.currentTurn;
 
     // Emit to this socket only
     socket.emit('current_turn', currentTurnIndex);
@@ -56,13 +59,26 @@ io.on('connection', (socket) => {
     if (result.error) {
       socket.emit('invalid_move', result.error);
     } else {
-      io.emit('card_played', { playerId: socket.id, card });
+      io.emit('card_played', { 
+        playerId: socket.id, 
+        card,
+        nextTurn: game.currentTurn // Include info about whose turn is next
+      });
 
-      if (game.currentTrick.length === 0) {
+      // Let all clients know whose turn it is now
+      io.emit('current_turn', game.currentTurn);
+
+      if (game.currentTrick.length === 0) { // This means trick is complete
+        const winningPlayerIndex = game.lastTrickWinner;
+        
         io.emit('trick_complete', {
           tricksWon: game.tricksWon,
-          tensCount: game.tensCount
+          tensCount: game.tensCount,
+          nextTurn: winningPlayerIndex // Include who starts next trick
         });
+        
+        // Broadcast the new current turn again to make sure everyone is synced
+        io.emit('current_turn', game.currentTurn);
 
         if (game.gameOver) {
           io.emit('game_over', {
